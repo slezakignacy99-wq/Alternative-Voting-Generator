@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voting Generator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      min-height: 100vh;
+      margin: 0;
+      padding: 40px;
+      color: #fff;
+    }
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: rgba(255,255,255,0.08);
+      padding: 30px;
+      border-radius: 18px;
+      position: relative;
+    }
+    h1 { text-align: center; }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      background: #ffcc00;
+      font-weight: bold;
+    }
+    button.small { padding: 6px 12px; font-size: 12px; }
+    .party-row {
+      display: grid;
+      grid-template-columns: 2fr 2fr 1.5fr 1fr auto;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    input, select {
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+    }
+    input[type="color"] { height: 36px; padding: 0; }
+    .results { margin-top: 30px; }
+    .flex { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; }
+    canvas { background: transparent; }
+    .legend { max-width: 400px; }
+    .party { margin-bottom: 10px; }
+    .color-box { display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:6px; }
+    .lang-switch {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .lang-switch img {
+      width: 32px;
+      height: 22px;
+      cursor: pointer;
+      border-radius: 4px;
+      opacity: 0.7;
+    }
+    .lang-switch img.active {
+      opacity: 1;
+      outline: 2px solid #ffcc00;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+<div class="lang-switch">
+  <img src="https://flagcdn.com/w40/pl.png" onclick="setLang('pl')" id="pl">
+  <img src="https://flagcdn.com/w40/gb.png" onclick="setLang('en')" id="en">
+  <img src="https://flagcdn.com/w40/de.png" onclick="setLang('de')" id="de">
+  <img src="https://flagcdn.com/w40/fr.png" onclick="setLang('fr')" id="fr">
+  <img src="https://flagcdn.com/w40/ru.png" onclick="setLang('ru')" id="ru">
+  <img src="https://flagcdn.com/w40/it.png" onclick="setLang('it')" id="it">
+</div>
+
+<h1 id="title"></h1>
+<div id="partyList"></div>
+<button id="addBtn" onclick="addParty()"></button>
+<button id="genBtn" onclick="generateResults()" style="margin-left:10px"></button>
+
+<div id="results" class="results" style="display:none">
+  <h2 id="voteShareTitle"></h2>
+  <div class="flex">
+    <canvas id="pie" width="400" height="400"></canvas>
+    <div id="legend" class="legend"></div>
+  </div>
+  <h2 id="seatTitle"></h2>
+  <label id="seatLabel"></label>
+  <input type="number" id="seatCount" min="10" max="1000" value="460" style="width:120px;margin:10px 0">
+  <canvas id="sejm" width="900" height="500"></canvas>
+</div>
+</div>
+
+<script>
+let lang='pl', lastParties=[], lastPerc=[];
+
+const dict={
+pl:{title:'Generator Alternatywnego Głosowania',add:'➕ Dodaj partię',gen:'🗳️ Generuj',vote:'Poparcie (%)',seats:'Podział mandatów w parlamencie',seat:'📏 Liczba miejsc:',name:'Nazwa partii',leader:'Lider',res:'Wyniki'},
+en:{title:'Alternative Voting Generator',add:'➕ Add party',gen:'🗳️ Generate',vote:'Vote share (%)',seats:'Parliament seat distribution',seat:'📏 Number of seats:',name:'Party name',leader:'Leader',res:'Results'},
+de:{title:'Alternativer Wahlgenerator',add:'➕ Partei hinzufügen',gen:'🗳️ Generieren',vote:'Stimmenanteil (%)',seats:'Sitzverteilung im Parlament',seat:'📏 Anzahl der Sitze:',name:'Parteiname',leader:'Vorsitzender',res:'Ergebnisse'},
+fr:{title:'Générateur de vote alternatif',add:'➕ Ajouter un parti',gen:'🗳️ Générer',vote:'Part des voix (%)',seats:'Répartition des sièges',seat:'📏 Nombre de sièges :',name:'Nom du parti',leader:'Chef',res:'Résultats'},
+ru:{title:'Генератор альтернативного голосования',add:'➕ Добавить партию',gen:'🗳️ Сгенерировать',vote:'Доля голосов (%)',seats:'Распределение мест',seat:'📏 Количество мест:',name:'Название партии',leader:'Лидер',res:'Результаты'},
+it:{title:'Generatore di voto alternativo',add:'➕ Aggiungi partito',gen:'🗳️ Genera',vote:'Quota di voto (%)',seats:'Distribuzione dei seggi',seat:'📏 Numero di seggi:',name:'Nome del partito',leader:'Leader',res:'Risultati'}
+};
+
+function setLang(l){
+  lang=l;document.documentElement.lang=l;
+  Object.keys(dict).forEach(k=>document.getElementById(k)?.classList.remove('active'));
+  document.getElementById(l).classList.add('active');
+  title.innerText=dict[l].title;addBtn.innerText=dict[l].add;genBtn.innerText=dict[l].gen;
+  voteShareTitle.innerText=dict[l].vote;seatTitle.innerText=dict[l].seats;seatLabel.innerText=dict[l].seat;
+  document.querySelectorAll('.party-row').forEach(r=>{const i=r.querySelectorAll('input');i[0].placeholder=dict[l].name;i[1].placeholder=dict[l].leader;});
+  if(lastParties.length) drawLegend(lastPerc,lastParties);
+}
+
+function randomColor(){return '#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0');}
+
+function addParty(name='',leader='',strength='random',color=randomColor()){
+  const d=document.createElement('div');d.className='party-row';
+  d.innerHTML=`<input placeholder="${dict[lang].name}" value="${name}"><input placeholder="${dict[lang].leader}" value="${leader}">
+  <select><option value="random">Random</option><option value="minor">Minor</option><option value="medium">Medium</option><option value="popular">Popular</option></select>
+  <input type="color" value="${color}"><button class="small" onclick="this.parentElement.remove()">❌</button>`;
+  partyList.appendChild(d);
+}
+
+function strengthWeight(s){if(s==='minor')return Math.random()*0.5+0.2;if(s==='medium')return Math.random()*1.2+0.8;if(s==='popular')return Math.random()*2+2;return Math.random()*2;}
+
+function generateResults(){
+  const rows=[...document.querySelectorAll('.party-row')];if(rows.length<2){alert('Add at least two parties');return;}
+  let parties=[];rows.forEach(r=>{const i=r.querySelectorAll('input,select');if(i[0].value.trim())parties.push({name:i[0].value,leader:i[1].value||'—',strength:i[2].value,color:i[3].value});});
+  let raw=parties.map(p=>strengthWeight(p.strength)),sum=raw.reduce((a,b)=>a+b,0),perc=raw.map(v=>Math.round(v/sum*100));perc[0]+=100-perc.reduce((a,b)=>a+b,0);
+  lastParties=parties;lastPerc=perc;drawPie(perc,parties);drawLegend(perc,parties);drawParliament();results.style.display='block';
+}
+
+function drawPie(data,parties){const c=pie,ctx=c.getContext('2d');let a=-0.5*Math.PI;ctx.clearRect(0,0,400,400);data.forEach((v,i)=>{let s=v/100*2*Math.PI;ctx.beginPath();ctx.moveTo(200,200);ctx.arc(200,200,180,a,a+s);ctx.fillStyle=parties[i].color;ctx.fill();a+=s;});}
+
+function drawLegend(data,parties){legend.innerHTML=`<h3>${dict[lang].res}</h3>`;parties.forEach((p,i)=>legend.innerHTML+=`<div class='party'><span class='color-box' style='background:${p.color}'></span><strong>${p.name}</strong> – ${data[i]}%<br>${dict[lang].leader}: ${p.leader}</div>`);}
+
+function getSeatColor(i){let a=0;for(let x=0;x<lastPerc.length;x++){a+=lastPerc[x];if(i<a)return lastParties[x].color;}return '#888';}
+
+function drawParliament(){const c=sejm,ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);const total=+seatCount.value,cx=c.width/2,cy=c.height-20,r=6,g=4,step=r*2+g,rows=Math.ceil(Math.sqrt(total)/1.8);let p=0;
+  for(let row=0;row<rows;row++){const y=cy-row*step,cols=Math.ceil(Math.PI*(row+1)),n=Math.min(cols,total-p),sx=cx-(n-1)*step/2;
+    for(let i=0;i<n;i++){ctx.beginPath();ctx.arc(sx+i*step,y,r,0,Math.PI*2);ctx.fillStyle=getSeatColor(p);ctx.fill();p++;if(p>=total)return;}}
+}
+
+addParty('Partia Reform','Jan Kowalski');addParty('Unia Ludowa','Anna Nowak');addParty('Ruch Obywatelski','Piotr Zieliński');
+setLang('pl');
+</script>
+</body>
+</html>
